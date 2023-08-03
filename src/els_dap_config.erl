@@ -35,7 +35,6 @@
     | capabilities
     | diagnostics
     | deps_dirs
-    | deps_paths
     | include_dirs
     | lenses
     | otp_path
@@ -45,7 +44,6 @@
     | elvis_config_path
     | compiler_telemetry_enabled
     | refactorerl
-    | wrangler
     | edoc_custom_tags
     | providers.
 
@@ -55,14 +53,12 @@
     lenses => [els_code_lens:lens_id()],
     diagnostics => [els_diagnostics:diagnostic_id()],
     deps_dirs => [path()],
-    deps_paths => [path()],
     include_dirs => [path()],
     otp_path => path(),
     plt_path => path(),
     root_uri => uri(),
     code_reload => map() | 'disabled',
     compiler_telemetry_enabled => boolean(),
-    wrangler => map() | 'notconfigured',
     refactorerl => map() | 'notconfigured',
     providers => map()
 }.
@@ -126,46 +122,6 @@ do_initialize(RootUri, Capabilities, _InitOptions, {ConfigPath, Config}) ->
     EDocCustomTags = maps:get("edoc_custom_tags", Config, []),
     RefactorErl = maps:get("refactorerl", Config, notconfigured),
     Providers = maps:get("providers", Config, #{}),
-
-    %% Initialize and start Wrangler
-    case maps:get("wrangler", Config, notconfigured) of
-        notconfigured ->
-            ok = set(wrangler, notconfigured);
-        Wrangler ->
-            ok = set(wrangler, Wrangler),
-            case maps:get("path", Wrangler, notconfigured) of
-                notconfigured ->
-                    ?LOG_INFO(
-                        "Wrangler path is not configured,\n"
-                        "                assuming it is installed system-wide."
-                    );
-                Path ->
-                    case code:add_path(Path) of
-                        true ->
-                            ok;
-                        {error, bad_directory} ->
-                            ?LOG_INFO(
-                                "Wrangler path is configured but\n"
-                                "                    not a valid ebin directory: ~p",
-                                [Path]
-                            )
-                    end
-            end,
-            case application:load(wrangler) of
-                ok ->
-                    case apply(api_wrangler, start, []) of
-                        % Function defined in Wrangler.
-                        % Using apply to circumvent tests resulting in 'unknown function'.
-                        ok ->
-                            ?LOG_INFO("Wrangler started successfully");
-                        {error, Reason} ->
-                            ?LOG_INFO("Wrangler could not be started: ~p", [Reason])
-                    end;
-                {error, Reason} ->
-                    ?LOG_INFO("Wrangler could not be loaded: ~p", [Reason])
-            end
-    end,
-
     %% Passed by the LSP client
     ok = set(root_uri, RootUri),
     %% Read from the configuration file
@@ -191,7 +147,6 @@ do_initialize(RootUri, Capabilities, _InitOptions, {ConfigPath, Config}) ->
     ok = set(compiler_telemetry_enabled, CompilerTelemetryEnabled),
     ok = set(edoc_custom_tags, EDocCustomTags),
     ok = set(incremental_sync, IncrementalSync),
-    ok = set(deps_paths, project_paths(RootPath, DepsDirs, false)),
     ok = set(lenses, Lenses),
     ok = set(diagnostics, Diagnostics),
     %% All (including subdirs) paths used to search files with file:path_open/3
@@ -321,29 +276,6 @@ report_broken_config(Path, Reason) ->
         "Visit: https://erlang-ls.github.io/configuration/",
         [Path, Reason]
     ).
-
--spec project_paths(path(), [string()], boolean()) -> [string()].
-project_paths(RootPath, Dirs, Recursive) ->
-    Paths = [
-        els_dap_utils:resolve_paths(
-            [
-                [RootPath, Dir, "src"],
-                [RootPath, Dir, "test"],
-                [RootPath, Dir, "include"]
-            ],
-            Recursive
-        )
-     || Dir <- Dirs
-    ],
-    case Recursive of
-        false ->
-            lists:append(Paths);
-        true ->
-            Filter = fun(Path) ->
-                string:find(Path, "SUITE_data", trailing) =:= nomatch
-            end,
-            lists:filter(Filter, lists:append(Paths))
-    end.
 
 -spec add_code_paths(
     Dirs :: list(string()),
