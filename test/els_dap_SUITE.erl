@@ -59,7 +59,7 @@ init_per_testcase(_TestCase, _Config) ->
 
 -spec end_per_testcase(atom(), config()) -> ok.
 end_per_testcase(_TestCase, _Config) ->
-  unset_all_env(els_dap),
+    unset_all_env(els_dap),
     ok.
 
 %%==============================================================================

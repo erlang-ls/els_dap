@@ -5,7 +5,7 @@
     all/2,
     wait_for/2,
     wait_for_fun/3,
-         wait_until_mock_called/2
+    wait_until_mock_called/2
 ]).
 
 -include_lib("common_test/include/ct.hrl").

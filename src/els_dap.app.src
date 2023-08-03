@@ -7,7 +7,7 @@
         kernel,
         stdlib,
         getopt,
-                    jsx
+        jsx
     ]},
     {env, []},
     {modules, []},
