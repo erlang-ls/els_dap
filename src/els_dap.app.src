@@ -7,8 +7,7 @@
         kernel,
         stdlib,
         getopt,
-        jsx,
-        yamerl
+        jsx
     ]},
     {env, []},
     {modules, []},

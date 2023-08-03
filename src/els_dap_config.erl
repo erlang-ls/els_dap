@@ -236,18 +236,11 @@ find_config(Paths) ->
 
 -spec consult_config(path()) -> {ok, map()} | {error, term()}.
 consult_config(Path) ->
-    Options = [{map_node_format, map}],
-    try yamerl:decode_file(Path, Options) of
-        [] ->
-            ?LOG_WARNING("Using empty configuration from ~s", [Path]),
-            {ok, #{}};
-        [Config] when is_map(Config) ->
+    case file:consult(Path) of
+        {ok, [Config]} when is_map(Config) ->
             {ok, Config};
-        _ ->
-            {error, {syntax_error, Path}}
-    catch
-        Class:Error ->
-            {error, {Class, Error}}
+        Error ->
+            {error, {invalid_config, Error}}
     end.
 
 -spec report_missing_config() -> ok.

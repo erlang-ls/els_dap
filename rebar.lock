@@ -1,10 +1,6 @@
 {"1.2.0",
 [{<<"getopt">>,{pkg,<<"getopt">>,<<"1.0.1">>},0},
- {<<"jsx">>,{pkg,<<"jsx">>,<<"3.0.0">>},0},
- {<<"yamerl">>,
-  {git,"https://github.com/erlang-ls/yamerl.git",
-       {ref,"9a9f7a2e84554992f2e8e08a8060bfe97776a5b7"}},
-  0}]}.
+ {<<"jsx">>,{pkg,<<"jsx">>,<<"3.0.0">>},0}]}.
 [
 {pkg_hash,[
  {<<"getopt">>, <<"C73A9FA687B217F2FF79F68A3B637711BB1936E712B521D8CE466B29CBF7808A">>},
