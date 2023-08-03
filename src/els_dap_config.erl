@@ -33,10 +33,8 @@
 -type key() ::
     apps_dirs
     | capabilities
-    | diagnostics
     | deps_dirs
     | include_dirs
-    | lenses
     | otp_path
     | plt_path
     | root_uri
@@ -50,8 +48,6 @@
 -type path() :: file:filename().
 -type state() :: #{
     apps_dirs => [path()],
-    lenses => [els_code_lens:lens_id()],
-    diagnostics => [els_diagnostics:diagnostic_id()],
     deps_dirs => [path()],
     include_dirs => [path()],
     otp_path => path(),
@@ -109,8 +105,6 @@ do_initialize(RootUri, Capabilities, _InitOptions, {ConfigPath, Config}) ->
     ExcludeUnusedIncludes = maps:get("exclude_unused_includes", Config, []),
     Macros = maps:get("macros", Config, []),
     DialyzerPltPath = maps:get("plt_path", Config, undefined),
-    Lenses = maps:get("lenses", Config, #{}),
-    Diagnostics = maps:get("diagnostics", Config, #{}),
     CodeReload = maps:get("code_reload", Config, disabled),
     Runtime = maps:get("runtime", Config, #{}),
     CodePathExtraDirs = maps:get("code_path_extra_dirs", Config, []),
@@ -147,8 +141,6 @@ do_initialize(RootUri, Capabilities, _InitOptions, {ConfigPath, Config}) ->
     ok = set(compiler_telemetry_enabled, CompilerTelemetryEnabled),
     ok = set(edoc_custom_tags, EDocCustomTags),
     ok = set(incremental_sync, IncrementalSync),
-    ok = set(lenses, Lenses),
-    ok = set(diagnostics, Diagnostics),
     %% All (including subdirs) paths used to search files with file:path_open/3
     %% Init Options
     ok = set(capabilities, Capabilities),

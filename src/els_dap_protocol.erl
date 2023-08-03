@@ -18,9 +18,6 @@
     error_response/3
 ]).
 
-%% Data Structures
--export([range/1]).
-
 %%==============================================================================
 %% Includes
 %%==============================================================================
@@ -88,16 +85,6 @@ error_response(Seq, Command, Error) ->
     },
     ?LOG_DEBUG("[Response] [message=~p]", [Message]),
     content(jsx:encode(Message)).
-
-%%==============================================================================
-%% Data Structures
-%%==============================================================================
--spec range(els_poi:poi_range()) -> range().
-range(#{from := {FromL, FromC}, to := {ToL, ToC}}) ->
-    #{
-        start => #{line => FromL - 1, character => FromC - 1},
-        'end' => #{line => ToL - 1, character => ToC - 1}
-    }.
 
 %%==============================================================================
 %% Internal Functions
