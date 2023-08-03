@@ -1,7 +1,5 @@
 # els_dap
 
-![erlang_ls](images/erlang-ls-logo-small.png?raw=true "Erlang LS")
-
 A standalone version of the DAP debugger originally included as part of Erlang LS.
 
 ## Minimum Requirements
