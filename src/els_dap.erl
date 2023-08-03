@@ -21,13 +21,12 @@
 -spec main([any()]) -> ok.
 main(Args) ->
     application:load(getopt),
-    application:load(els_core),
     application:load(els_dap),
     ok = parse_args(Args),
-    application:set_env(els_core, server, els_dap_server),
+    application:set_env(els_dap, server, els_dap_server),
     configure_logging(),
     ?LOG_DEBUG("Ensure EPMD is running", []),
-    0 = els_utils:cmd("epmd", ["-daemon"]),
+    0 = els_dap_utils:cmd("epmd", ["-daemon"]),
     {ok, _} = application:ensure_all_started(?APP, permanent),
     patch_logging(),
     ?LOG_INFO("Started Erlang LS - DAP server", []),
@@ -79,9 +78,9 @@ set_args([{Arg, Val} | Rest]) ->
 
 -spec set(atom(), getopt:arg_value()) -> ok.
 set(log_dir, Dir) ->
-    application:set_env(els_core, log_dir, Dir);
+    application:set_env(els_dap, log_dir, Dir);
 set(log_level, Level) ->
-    application:set_env(els_core, log_level, list_to_atom(Level)).
+    application:set_env(els_dap, log_level, list_to_atom(Level)).
 
 %%==============================================================================
 %% Logger configuration
@@ -90,7 +89,7 @@ set(log_level, Level) ->
 -spec configure_logging() -> ok.
 configure_logging() ->
     LogFile = filename:join([log_root(), "dap_server.log"]),
-    {ok, LoggingLevel} = application:get_env(els_core, log_level),
+    {ok, LoggingLevel} = application:get_env(els_dap, log_level),
     ok = filelib:ensure_dir(LogFile),
     Handler = #{
         config => #{file => LogFile},
@@ -116,7 +115,7 @@ configure_logging() ->
             }}
     },
     [logger:remove_handler(H) || H <- logger:get_handler_ids()],
-    logger:add_handler(els_core_handler, logger_std_h, Handler),
+    logger:add_handler(els_dap_core_handler, logger_std_h, Handler),
     logger:set_primary_config(level, LoggingLevel),
     ok.
 
@@ -128,7 +127,7 @@ patch_logging() ->
 
 -spec log_root() -> string().
 log_root() ->
-    {ok, LogDir} = application:get_env(els_core, log_dir),
+    {ok, LogDir} = application:get_env(els_dap, log_dir),
     {ok, CurrentDir} = file:get_cwd(),
     Dirname = filename:basename(CurrentDir),
     filename:join([LogDir, Dirname]).

@@ -70,7 +70,7 @@ start_link() ->
     Cb = fun(Requests) ->
         gen_server:cast(Pid, {process_requests, Requests})
     end,
-    {ok, _} = els_stdio:start_listener(Cb),
+    {ok, _} = els_dap_stdio:start_listener(Cb),
     {ok, Pid}.
 
 -spec process_requests([any()]) -> ok.
@@ -180,4 +180,4 @@ do_send_request(Method, Params, #state{seq = RequestId0} = State0) ->
 
 -spec send(binary(), state()) -> ok.
 send(Payload, #state{io_device = IoDevice}) ->
-    els_stdio:send(IoDevice, Payload).
+    els_dap_stdio:send(IoDevice, Payload).

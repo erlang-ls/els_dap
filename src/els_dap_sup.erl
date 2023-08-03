@@ -51,9 +51,14 @@ init([]) ->
     restrict_stdio_access(),
     ChildSpecs = [
         #{
-            id => els_config,
-            start => {els_config, start_link, []},
+            id => els_dap_config,
+            start => {els_dap_config, start_link, []},
             shutdown => brutal_kill
+        },
+        #{
+            id => els_dap_distribution_sup,
+            start => {els_dap_distribution_sup, start_link, []},
+            type => supervisor
         },
         #{
             id => els_dap_provider,
@@ -80,9 +85,9 @@ init([]) ->
 -spec restrict_stdio_access() -> ok.
 restrict_stdio_access() ->
     ?LOG_INFO("Use group leader as io_device"),
-    case application:get_env(els_core, io_device, standard_io) of
+    case application:get_env(els_dap, io_device, standard_io) of
         standard_io ->
-            application:set_env(els_core, io_device, erlang:group_leader());
+            application:set_env(els_dap, io_device, erlang:group_leader());
         _ ->
             ok
     end,

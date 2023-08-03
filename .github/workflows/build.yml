@@ -1,0 +1,102 @@
+name: Build
+on:
+  push:
+    branches:
+      - '*'
+  pull_request:
+    types:
+      - opened
+      - synchronize
+jobs:
+  linux:
+    strategy:
+      matrix:
+        platform: [ubuntu-latest]
+        otp-version: [23, 24, 25]
+    runs-on: ${{ matrix.platform }}
+    container:
+      image: erlang:${{ matrix.otp-version }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Cache Hex packages
+      uses: actions/cache@v1
+      with:
+        path: ~/.cache/rebar3/hex/hexpm/packages
+        key: ${{ runner.os }}-hex-${{ hashFiles(format('{0}{1}', github.workspace, '/rebar.lock')) }}
+        restore-keys: |
+          ${{ runner.os }}-hex-
+    - name: Cache Dialyzer PLTs
+      uses: actions/cache@v1
+      with:
+        path: ~/.cache/rebar3/rebar3_*_plt
+        key: ${{ runner.os }}-dialyzer-${{ hashFiles(format('{0}{1}', github.workspace, '/rebar.config')) }}
+        restore-keys: |
+          ${{ runner.os }}-dialyzer-
+    - name: Compile
+      run: rebar3 compile
+    - name: Escriptize Debugger
+      run: rebar3 escriptize
+    - name: Store Debugger Escript
+      uses: actions/upload-artifact@v2
+      with:
+        name: els_dap
+        path: _build/default/bin/els_dap
+    - name: Check formatting
+      run: rebar3 fmt -c
+    - name: Lint
+      run: rebar3 lint
+    - name: Generate Dialyzer PLT for usage in CT Tests
+      run: dialyzer --build_plt --apps erts kernel stdlib
+    - name: Start epmd as daemon
+      run: epmd -daemon
+    - name: Run CT Tests
+      run: rebar3 ct
+    - name: Store CT Logs
+      uses: actions/upload-artifact@v2
+      with:
+        name: ct-logs
+        path: _build/test/logs
+    - name: Run Checks
+      run: rebar3 do dialyzer, xref
+    - name: Create Cover Reports
+      run: rebar3 do cover
+    - name: Produce Documentation
+      run: rebar3 edoc
+      if: ${{ matrix.otp-version == '24' }}
+    - name: Publish Documentation
+      uses: actions/upload-artifact@v2
+      with:
+        name: edoc
+        path: |
+          doc
+  windows:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Install Erlang
+      run: choco install -y erlang --version 23.3
+    - name: Install rebar3
+      run: choco install -y rebar3 --version 3.13.1
+    - name: Compile
+      run: rebar3 compile
+    - name: Lint
+      run: rebar3 lint
+    - name: Generate Dialyzer PLT for usage in CT Tests
+      run: dialyzer --build_plt --apps erts kernel stdlib
+    - name: Start epmd as daemon
+      run: erl -sname a -noinput -eval "halt(0)."
+    - name: Run CT Tests
+      run: rebar3 ct
+    - name: Store CT Logs
+      uses: actions/upload-artifact@v2
+      with:
+        name: ct-logs
+        path: _build/test/logs
+    - name: Run PropEr Tests
+      run: rebar3 proper --cover --constraint_tries 100
+    - name: Run Checks
+      run: rebar3 do dialyzer, xref
+    - name: Produce Documentation
+      run: rebar3 edoc

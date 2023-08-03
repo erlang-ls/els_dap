@@ -56,7 +56,7 @@ type(Breakpoints, Module, Line) ->
     {module(), #{line() => line_breaks()}}.
 build_source_breakpoints(Params) ->
     #{<<"source">> := #{<<"path">> := Path}} = Params,
-    Module = els_uri:module(els_uri:uri(Path)),
+    Module = els_dap_uri:module(els_dap_uri:uri(Path)),
     SourceBreakpoints = maps:get(<<"breakpoints">>, Params, []),
     _SourceModified = maps:get(<<"sourceModified">>, Params, false),
     {Module,

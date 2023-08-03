@@ -39,7 +39,7 @@ suite() ->
 
 -spec all() -> [atom()].
 all() ->
-    els_test_utils:all(?MODULE).
+    els_dap_test_utils:all(?MODULE).
 
 -spec groups() -> [atom()].
 groups() ->
@@ -59,7 +59,7 @@ init_per_testcase(_TestCase, _Config) ->
 
 -spec end_per_testcase(atom(), config()) -> ok.
 end_per_testcase(_TestCase, _Config) ->
-    unset_all_env(els_core),
+  unset_all_env(els_dap),
     ok.
 
 %%==============================================================================
@@ -90,7 +90,7 @@ parse_args(_Config) ->
             "error"
         ],
     els_dap:parse_args(Args),
-    ?assertEqual('error', application:get_env(els_core, log_level, undefined)),
+    ?assertEqual('error', application:get_env(els_dap, log_level, undefined)),
     ok.
 
 -spec log_root(config()) -> ok.

@@ -76,20 +76,18 @@ init() ->
         hits => #{},
         timeout => 30,
         mode => undefined,
-        cwd => els_utils:to_binary(Cwd)
+        cwd => els_dap_utils:to_binary(Cwd)
     }.
 
 -spec handle_request(request(), state()) ->
     {result(), state()} | {{error, binary()}, state()}.
 handle_request({<<"initialize">>, _Params}, State) ->
-    %% quick fix to satisfy els_config initialization
+    %% quick fix to satisfy els_dap_config initialization
     {ok, RootPath} = file:get_cwd(),
-    RootUri = els_uri:uri(els_utils:to_binary(RootPath)),
+    RootUri = els_dap_uri:uri(els_dap_utils:to_binary(RootPath)),
     InitOptions = #{},
     Capabilities = capabilities(),
-    %% we can't use LSP notifications here, see
-    %% https://github.com/erlang-ls/erlang_ls/issues/1060
-    ok = els_config:initialize(RootUri, Capabilities, InitOptions, log),
+    ok = els_dap_config:initialize(RootUri, Capabilities, InitOptions),
     {Capabilities, State};
 handle_request({<<"launch">>, #{<<"cwd">> := Cwd} = Params}, State) ->
     case start_distribution(Params) of
@@ -121,7 +119,7 @@ handle_request({<<"launch">>, #{<<"cwd">> := Cwd} = Params}, State) ->
                         end,
                     ?LOG_INFO("launching 'rebar3 shell`", []),
                     spawn(fun() ->
-                        els_utils:cmd(
+                        els_dap_utils:cmd(
                             "rebar3",
                             [
                                 "shell",
@@ -445,7 +443,7 @@ handle_request(
             {#{<<"result">> => <<"not available">>}, State};
         Frame ->
             Bindings = maps:get(bindings, Frame),
-            VarName = erlang:list_to_atom(els_utils:to_list(Input)),
+            VarName = erlang:list_to_atom(els_dap_utils:to_list(Input)),
             case proplists:lookup(VarName, Bindings) of
                 {VarName, VarValue} ->
                     build_evaluate_response(VarValue, State);
@@ -799,7 +797,7 @@ pid_by_frame_id(FrameId, Threads) ->
 
 -spec format_mfa(module(), atom(), integer()) -> binary().
 format_mfa(M, F, A) ->
-    els_utils:to_binary(io_lib:format("~p:~p/~p", [M, F, A])).
+    els_dap_utils:to_binary(io_lib:format("~p:~p/~p", [M, F, A])).
 
 -spec parse_mfa(string()) -> {module(), atom(), non_neg_integer()} | error.
 parse_mfa(MFABinary) ->
@@ -966,7 +964,7 @@ build_evaluate_response(
 format_term(T) ->
     %% print on one line and print strings
     %% as printable characters (if possible)
-    els_utils:to_binary(
+    els_dap_utils:to_binary(
         [
             string:trim(Line)
          || Line <- string:split(io_lib:format("~tp", [T]), "\n", all)
@@ -1014,7 +1012,7 @@ ensure_connected(Node, Timeout) ->
         false ->
             % connect and monitore project node
             case
-                els_distribution_server:wait_connect_and_monitor(
+                els_dap_distribution_server:wait_connect_and_monitor(
                     Node,
                     Timeout,
                     hidden
@@ -1031,7 +1029,7 @@ stop_debugger() ->
     els_dap_server:send_event(<<"terminated">>, #{}),
     els_dap_server:send_event(<<"exited">>, #{<<"exitCode">> => 0}),
     ?LOG_NOTICE("terminating debug adapter"),
-    els_utils:halt(0).
+    els_dap_utils:halt(0).
 
 -spec is_node_connected(node()) -> boolean().
 is_node_connected(Node) ->
@@ -1040,7 +1038,7 @@ is_node_connected(Node) ->
 -spec safe_eval(node(), pid(), string(), update | no_update) -> term().
 safe_eval(ProjectNode, Debugged, Expression, Update) ->
     {ok, Meta} = els_dap_rpc:get_meta(ProjectNode, Debugged),
-    Command = els_utils:to_list(Expression),
+    Command = els_dap_utils:to_list(Expression),
     Return = els_dap_rpc:meta_eval(ProjectNode, Meta, Command),
     case Update of
         update ->
@@ -1062,7 +1060,7 @@ start_distribution(Params) ->
     DefaultConfig = #{
         <<"projectnode">> =>
             atom_to_binary(
-                els_distribution_server:node_name(<<"erlang_ls_dap_project">>, Name),
+                els_dap_distribution_server:node_name(<<"erlang_ls_dap_project">>, Name),
                 utf8
             ),
         <<"cookie">> => atom_to_binary(erlang:get_cookie(), utf8),
@@ -1084,14 +1082,14 @@ start_distribution(Params) ->
         end,
 
     ConfProjectNode0 = binary_to_list(RawProjectNode),
-    ConfProjectNode = els_utils:compose_node_name(ConfProjectNode0, NameType),
+    ConfProjectNode = els_dap_utils:compose_node_name(ConfProjectNode0, NameType),
     ?LOG_INFO("Configured Project Node Name: ~p", [ConfProjectNode]),
     Cookie = binary_to_atom(ConfCookie, utf8),
 
     %% start distribution
-    LocalNode = els_distribution_server:node_name(<<"erlang_ls_dap">>, Name),
+    LocalNode = els_dap_distribution_server:node_name(<<"erlang_ls_dap">>, Name),
     case
-        els_distribution_server:start_distribution(
+        els_dap_distribution_server:start_distribution(
             LocalNode,
             ConfProjectNode,
             Cookie,
@@ -1108,7 +1106,7 @@ start_distribution(Params) ->
 
 -spec distribution_error(any()) -> binary().
 distribution_error(Error) ->
-    els_utils:to_binary(
+    els_dap_utils:to_binary(
         lists:flatten(
             io_lib:format("Could not start Erlang distribution. ~p", [Error])
         )

@@ -94,7 +94,7 @@ init_per_testcase(TestCase, Config) when
         TestCase =:= breakpoints_with_cond_and_hit
 ->
     {ok, DAPProvider} = els_dap_provider:start_link(),
-    {ok, _} = els_config:start_link(),
+    {ok, _} = els_dap_config:start_link(),
     meck:expect(els_dap_server, send_event, 2, meck:val(ok)),
     [{provider, DAPProvider}, {node, node_name()} | Config];
 init_per_testcase(_TestCase, Config0) ->
@@ -112,9 +112,9 @@ init_per_testcase(_TestCase, Config0) ->
 end_per_testcase(_TestCase, Config) ->
     NodeName = ?config(node, Config),
     Node = binary_to_atom(NodeName, utf8),
-    unset_all_env(els_core),
+    unset_all_env(els_dap),
     ok = gen_server:stop(?config(provider, Config)),
-    gen_server:stop(els_config),
+    gen_server:stop(els_dap_config),
     %% kill the project node
     rpc:cast(Node, erlang, halt, []),
     ok.
@@ -206,7 +206,7 @@ launch_mfa(Config) ->
         Provider,
         request_launch(DataDir, Node, els_dap_test_module, entry, [])
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     ok.
 
 -spec launch_mfa_with_cookie(config()) -> ok.
@@ -226,7 +226,7 @@ launch_mfa_with_cookie(Config) ->
             []
         )
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     ok.
 
 -spec configuration_done(config()) -> ok.
@@ -239,7 +239,7 @@ configuration_done(Config) ->
         Provider,
         request_launch(DataDir, Node, els_dap_test_module, entry, [])
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     els_dap_provider:handle_request(Provider, request_configuration_done(#{})),
     ok.
 
@@ -262,7 +262,7 @@ configuration_done_with_long_names(Config) ->
             use_long_names
         )
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     ok.
 
 -spec configuration_done_with_long_names_using_host(config()) -> ok.
@@ -283,7 +283,7 @@ configuration_done_with_long_names_using_host(Config) ->
             use_long_names
         )
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     ok.
 
 -spec configuration_done_with_breakpoint(config()) -> ok.
@@ -296,7 +296,7 @@ configuration_done_with_breakpoint(Config) ->
         Provider,
         request_launch(DataDir, Node, els_dap_test_module, entry, [5])
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
 
     els_dap_provider:handle_request(
         Provider,
@@ -354,7 +354,7 @@ navigation_and_frames(_Config) ->
     %%, reset meck history, to capture next call
     meck:reset([els_dap_server]),
     els_dap_provider:handle_request(Provider, request_next(ThreadId)),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     %% check
     #{<<"stackFrames">> := Frames1} =
         els_dap_provider:handle_request(
@@ -373,7 +373,7 @@ navigation_and_frames(_Config) ->
     %% continue
     meck:reset([els_dap_server]),
     els_dap_provider:handle_request(Provider, request_continue(ThreadId)),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     %% check
     #{<<"stackFrames">> := Frames2} =
         els_dap_provider:handle_request(
@@ -396,7 +396,7 @@ navigation_and_frames(_Config) ->
     %% stepIn
     meck:reset([els_dap_server]),
     els_dap_provider:handle_request(Provider, request_step_in(ThreadId)),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     %% check
     #{<<"stackFrames">> := Frames3} =
         els_dap_provider:handle_request(
@@ -448,7 +448,7 @@ set_variable(_Config) ->
     ?assertEqual(#{<<"result">> => <<"1">>}, Result1),
 
     %% get variable value through hover evaluate
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     #{<<"stackFrames">> := [#{<<"id">> := FrameId2}]} =
         els_dap_provider:handle_request(
             Provider,
@@ -555,7 +555,7 @@ breakpoints(Config) ->
 project_node_exit(Config) ->
     NodeName = ?config(node, Config),
     Node = binary_to_atom(NodeName, utf8),
-    meck:expect(els_utils, halt, 1, meck:val(ok)),
+    meck:expect(els_dap_utils, halt, 1, meck:val(ok)),
     meck:reset(els_dap_server),
     erlang:monitor_node(Node, true),
     %% kill node and wait for nodedown message
@@ -563,8 +563,8 @@ project_node_exit(Config) ->
     receive
         {nodedown, Node} -> ok
     end,
-    %% wait until els_utils:halt has been called
-    els_test_utils:wait_until_mock_called(els_utils, halt).
+    %% wait until els_dap_utils:halt has been called
+    els_dap_test_utils:wait_until_mock_called(els_dap_utils, halt).
 %% there is a race condition in CI, important is that the process stops
 % ?assert(meck:called(els_dap_server, send_event, [<<"terminated">>, '_'])),
 % ?assert(meck:called(els_dap_server, send_event, [<<"exited">>, '_'])).
@@ -593,7 +593,7 @@ breakpoints_base(Config, BreakLine, Params, NExp) ->
         Provider,
         request_launch(DataDir, Node, els_dap_test_module, entry, [10])
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     meck:reset([els_dap_server]),
 
     els_dap_provider:handle_request(
@@ -672,7 +672,7 @@ log_points_base(Config, LogLine, Params, BreakLine, NumCalls) ->
         Provider,
         request_launch(DataDir, Node, els_dap_test_module, entry, [10])
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     meck:reset([els_dap_server]),
 
     els_dap_provider:handle_request(
@@ -704,7 +704,7 @@ remove_breakpoint(Config) ->
         Provider,
         request_launch(DataDir, Node, els_dap_test_module, dummy, [unused])
     ),
-    els_test_utils:wait_until_mock_called(els_dap_server, send_event),
+    els_dap_test_utils:wait_until_mock_called(els_dap_server, send_event),
     %% Set Breakpoint
     meck:reset([els_dap_server]),
     els_dap_provider:handle_request(
