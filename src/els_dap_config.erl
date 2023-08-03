@@ -33,6 +33,7 @@
 -type key() ::
     apps_dirs
     | capabilities
+    | config_path
     | deps_dirs
     | include_dirs
     | otp_path
