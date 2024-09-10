@@ -1043,6 +1043,8 @@ safe_eval(ProjectNode, Debugged, Expression, Update) ->
     case Update of
         update ->
             ok;
+        _ when Return == 'Parse error' ->
+            ok;
         no_update ->
             receive
                 {int_cb, Debugged} -> ok
