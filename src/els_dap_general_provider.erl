@@ -592,24 +592,16 @@ evaluate_hitcond(Breakpt, HitCount, Module, Line, ProjectNode, ThreadPid, Cwd) -
 -spec check_stop(
     els_dap_breakpoints:line_breaks(),
     boolean(),
-    module(),
-    integer(),
     atom(),
-    pid(),
-    binary()
+    pid()
 ) -> boolean().
-check_stop(Breakpt, IsHit, Module, Line, ProjectNode, ThreadPid, Cwd) ->
+check_stop(Breakpt, IsHit, ProjectNode, ThreadPid) ->
     case Breakpt of
         #{logexpr := LogExpr} ->
             case IsHit of
                 true ->
-                    Return = safe_eval(ProjectNode, ThreadPid, LogExpr, no_update),
-                    LogMessage = unicode:characters_to_binary(
-                        io_lib:format(
-                            "~s:~b - ~p~n",
-                            [source(Module, ProjectNode, Cwd), Line, Return]
-                        )
-                    ),
+                    Message = handle_logexpr(ProjectNode, ThreadPid, LogExpr),
+                    LogMessage = unicode:characters_to_binary(Message),
                     els_dap_server:send_event(
                         <<"output">>,
                         #{
@@ -623,6 +615,27 @@ check_stop(Breakpt, IsHit, Module, Line, ProjectNode, ThreadPid, Cwd) ->
             end;
         _ ->
             IsHit
+    end.
+
+-spec handle_logexpr(atom(), pid(), binary()) -> string().
+handle_logexpr(ProjectNode, ThreadPid, LogExpr) ->
+    case re:run(LogExpr, <<"\\{([^{}]+)\\}">>, [{capture, all_but_first, list}, global]) of
+        {match, Captured} ->
+            LogExpr2 = iolist_to_binary(["[", string:join(lists:map(fun([Cap]) ->
+                case lists:member($,, Cap) of
+                    true ->
+                        io_lib:format("{~s}", [Cap]);
+                    false -> Cap
+                end
+            end, Captured), ","), "]"]),
+            Format = re:replace(LogExpr, <<"\\{+[^{}]+\\}+">>, <<"~p">>, [global, {return, list}]),
+            Return = safe_eval(ProjectNode, ThreadPid, LogExpr2, no_update),
+            case is_list(Return) of
+                true ->
+                    io_lib:format(Format ++ "~n", Return);
+                _ -> io_lib:format("~p~n", [Return])
+            end;
+        _ -> io_lib:format("~s~n", [LogExpr])
     end.
 
 -spec debug_stop(thread_id()) -> mode().
@@ -679,7 +692,7 @@ handle_info(
         Condition andalso
             evaluate_hitcond(Breakpt, HitCount, Module, Line, ProjectNode, ThreadPid, Cwd),
     %% finally, either stop or log
-    Stop = check_stop(Breakpt, IsHit, Module, Line, ProjectNode, ThreadPid, Cwd),
+    Stop = check_stop(Breakpt, IsHit, ProjectNode, ThreadPid),
     Mode1 =
         case Stop of
             true -> debug_stop(ThreadId);
