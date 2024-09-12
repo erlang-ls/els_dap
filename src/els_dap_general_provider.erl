@@ -454,7 +454,7 @@ handle_request(
 handle_request(
     {<<"evaluate">>,
         #{
-            <<"context">> := Context,
+            <<"context">> := <<"watch">>,
             <<"frameId">> := FrameId,
             <<"expression">> := Input
         } = _Params},
@@ -462,21 +462,36 @@ handle_request(
         threads := Threads,
         project_node := ProjectNode
     } = State
-) when Context =:= <<"watch">> orelse Context =:= <<"repl">> ->
-    %% repl and watch can use whole expressions,
+) ->
+    %% watch can use whole expressions,
     %% but we still want structured variable scopes
     case pid_by_frame_id(FrameId, maps:values(Threads)) of
         undefined ->
             {#{<<"result">> => <<"not available">>}, State};
         Pid ->
-            Update =
-                case Context of
-                    <<"watch">> -> no_update;
-                    <<"repl">> -> update
-                end,
-            Return = safe_eval(ProjectNode, Pid, Input, Update),
+            Return = safe_eval(ProjectNode, Pid, Input, no_update),
             build_evaluate_response(Return, State)
     end;
+handle_request(
+    {<<"evaluate">>,
+        #{
+            <<"context">> := <<"repl">>,
+            <<"expression">> := Input
+        } = _Params},
+    #{
+        project_node := ProjectNode
+    } = State
+) ->
+    Command = els_dap_utils:to_list(Input),
+    Cmd =
+        case lists:reverse(Command) of
+            [$.|_] -> Command;
+            T -> lists:reverse([$.|T])
+        end,
+    {ok, Ts, _} = erl_scan:string(Cmd),
+    {ok, Expr} = erl_parse:parse_exprs(Ts),
+    {value, Return, _} = rpc:call(ProjectNode, erl_eval, exprs, [Expr, erl_eval:new_bindings()]),
+    build_evaluate_response(Return, State);
 handle_request(
     {<<"variables">>, #{<<"variablesReference">> := Ref} = _Params},
     #{scope_bindings := AllBindings} = State
