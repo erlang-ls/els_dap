@@ -106,7 +106,14 @@ noop_group_leader() ->
             case Message of
                 {io_request, From, ReplyAs, getopts} ->
                     From ! {io_reply, ReplyAs, []};
-                {io_request, From, ReplyAs, _} ->
+                {io_request, From, ReplyAs, Converted} ->
+                    case Converted of
+                        {_, _, _, _, [Format, Args]} ->
+                            Output = unicode:characters_to_binary(io_lib:format(Format, Args)),
+                            els_dap_server:send_event(<<"output">>,
+                                #{<<"output">> => Output, <<"category">> => <<"stdout">>});
+                        _ -> ok
+                    end,
                     From ! {io_reply, ReplyAs, ok};
                 _ ->
                     ok

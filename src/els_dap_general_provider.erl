@@ -454,7 +454,7 @@ handle_request(
 handle_request(
     {<<"evaluate">>,
         #{
-            <<"context">> := Context,
+            <<"context">> := <<"watch">>,
             <<"frameId">> := FrameId,
             <<"expression">> := Input
         } = _Params},
@@ -462,21 +462,36 @@ handle_request(
         threads := Threads,
         project_node := ProjectNode
     } = State
-) when Context =:= <<"watch">> orelse Context =:= <<"repl">> ->
-    %% repl and watch can use whole expressions,
+) ->
+    %% watch can use whole expressions,
     %% but we still want structured variable scopes
     case pid_by_frame_id(FrameId, maps:values(Threads)) of
         undefined ->
             {#{<<"result">> => <<"not available">>}, State};
         Pid ->
-            Update =
-                case Context of
-                    <<"watch">> -> no_update;
-                    <<"repl">> -> update
-                end,
-            Return = safe_eval(ProjectNode, Pid, Input, Update),
+            Return = safe_eval(ProjectNode, Pid, Input, no_update),
             build_evaluate_response(Return, State)
     end;
+handle_request(
+    {<<"evaluate">>,
+        #{
+            <<"context">> := <<"repl">>,
+            <<"expression">> := Input
+        } = _Params},
+    #{
+        project_node := ProjectNode
+    } = State
+) ->
+    Command = els_dap_utils:to_list(Input),
+    Cmd =
+        case lists:reverse(Command) of
+            [$.|_] -> Command;
+            T -> lists:reverse([$.|T])
+        end,
+    {ok, Ts, _} = erl_scan:string(Cmd),
+    {ok, Expr} = erl_parse:parse_exprs(Ts),
+    {value, Return, _} = rpc:call(ProjectNode, erl_eval, exprs, [Expr, erl_eval:new_bindings()]),
+    build_evaluate_response(Return, State);
 handle_request(
     {<<"variables">>, #{<<"variablesReference">> := Ref} = _Params},
     #{scope_bindings := AllBindings} = State
@@ -592,24 +607,16 @@ evaluate_hitcond(Breakpt, HitCount, Module, Line, ProjectNode, ThreadPid, Cwd) -
 -spec check_stop(
     els_dap_breakpoints:line_breaks(),
     boolean(),
-    module(),
-    integer(),
     atom(),
-    pid(),
-    binary()
+    pid()
 ) -> boolean().
-check_stop(Breakpt, IsHit, Module, Line, ProjectNode, ThreadPid, Cwd) ->
+check_stop(Breakpt, IsHit, ProjectNode, ThreadPid) ->
     case Breakpt of
         #{logexpr := LogExpr} ->
             case IsHit of
                 true ->
-                    Return = safe_eval(ProjectNode, ThreadPid, LogExpr, no_update),
-                    LogMessage = unicode:characters_to_binary(
-                        io_lib:format(
-                            "~s:~b - ~p~n",
-                            [source(Module, ProjectNode, Cwd), Line, Return]
-                        )
-                    ),
+                    Message = handle_logexpr(ProjectNode, ThreadPid, LogExpr),
+                    LogMessage = unicode:characters_to_binary(Message),
                     els_dap_server:send_event(
                         <<"output">>,
                         #{
@@ -623,6 +630,27 @@ check_stop(Breakpt, IsHit, Module, Line, ProjectNode, ThreadPid, Cwd) ->
             end;
         _ ->
             IsHit
+    end.
+
+-spec handle_logexpr(atom(), pid(), binary()) -> string().
+handle_logexpr(ProjectNode, ThreadPid, LogExpr) ->
+    case re:run(LogExpr, <<"\\{([^{}]+)\\}">>, [{capture, all_but_first, list}, global]) of
+        {match, Captured} ->
+            LogExpr2 = iolist_to_binary(["[", string:join(lists:map(fun([Cap]) ->
+                case lists:member($,, Cap) of
+                    true ->
+                        io_lib:format("{~s}", [Cap]);
+                    false -> Cap
+                end
+            end, Captured), ","), "]"]),
+            Format = re:replace(LogExpr, <<"\\{+[^{}]+\\}+">>, <<"~p">>, [global, {return, list}]),
+            Return = safe_eval(ProjectNode, ThreadPid, LogExpr2, no_update),
+            case is_list(Return) of
+                true ->
+                    io_lib:format(Format ++ "~n", Return);
+                _ -> io_lib:format("~p~n", [Return])
+            end;
+        _ -> io_lib:format("~s~n", [LogExpr])
     end.
 
 -spec debug_stop(thread_id()) -> mode().
@@ -679,7 +707,7 @@ handle_info(
         Condition andalso
             evaluate_hitcond(Breakpt, HitCount, Module, Line, ProjectNode, ThreadPid, Cwd),
     %% finally, either stop or log
-    Stop = check_stop(Breakpt, IsHit, Module, Line, ProjectNode, ThreadPid, Cwd),
+    Stop = check_stop(Breakpt, IsHit, ProjectNode, ThreadPid),
     Mode1 =
         case Stop of
             true -> debug_stop(ThreadId);
@@ -1042,6 +1070,8 @@ safe_eval(ProjectNode, Debugged, Expression, Update) ->
     Return = els_dap_rpc:meta_eval(ProjectNode, Meta, Command),
     case Update of
         update ->
+            ok;
+        _ when Return == 'Parse error' ->
             ok;
         no_update ->
             receive
