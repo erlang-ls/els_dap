@@ -1150,4 +1150,9 @@ force_delete_breakpoints(ProjectNode, Module, Breakpoints) ->
 
 -spec strip_suffix(binary(), binary()) -> binary().
 strip_suffix(Path, Suffix) ->
-    binary:part(Path, 0, byte_size(Path) - binary:longest_common_suffix([Path, Suffix])).
+    SuffixSize = byte_size(Suffix),
+    PathSize = byte_size(Path),
+    case binary:part(Path, {PathSize, -SuffixSize}) of
+        Suffix -> binary:part(Path, {0, PathSize - SuffixSize});
+        _ -> Path
+    end.
