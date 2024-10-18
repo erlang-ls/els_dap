@@ -89,7 +89,9 @@ handle_request({<<"initialize">>, _Params}, State) ->
     Capabilities = capabilities(),
     ok = els_dap_config:initialize(RootUri, Capabilities, InitOptions),
     {Capabilities, State};
-handle_request({<<"launch">>, #{<<"cwd">> := Cwd} = Params}, State) ->
+handle_request({<<"launch">>, #{<<"cwd">> := Cwd0} = Params}, State) ->
+    StripSourcePrefix = maps:get(<<"stripSourcePrefix">>, Params, <<>>),
+    Cwd = strip_suffix(Cwd0, StripSourcePrefix),
     case start_distribution(Params) of
         {ok, #{
             <<"projectnode">> := ProjectNode,
@@ -103,7 +105,7 @@ handle_request({<<"launch">>, #{<<"cwd">> := Cwd} = Params}, State) ->
                         #{
                             <<"kind">> => <<"integrated">>,
                             <<"title">> => ProjectNode,
-                            <<"cwd">> => Cwd,
+                            <<"cwd">> => Cwd0,
                             <<"args">> => Cmd
                         },
                     ?LOG_INFO("Sending runinterminal request: [~p]", [ParamsR]),
@@ -1145,3 +1147,7 @@ force_delete_breakpoints(ProjectNode, Module, Breakpoints) ->
         _ ->
             ok
     end.
+
+-spec strip_suffix(binary(), binary()) -> binary().
+strip_suffix(Path, Suffix) ->
+    binary:part(Path, 0, byte_size(Path) - binary:longest_common_suffix([Path, Suffix])).
