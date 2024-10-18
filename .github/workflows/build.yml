@@ -38,7 +38,7 @@ jobs:
     - name: Escriptize Debugger
       run: rebar3 escriptize
     - name: Store Debugger Escript
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: els_dap
         path: _build/default/bin/els_dap
@@ -53,7 +53,7 @@ jobs:
     - name: Run CT Tests
       run: rebar3 ct
     - name: Store CT Logs
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ct-logs
         path: _build/test/logs
@@ -65,7 +65,7 @@ jobs:
       run: rebar3 edoc
       if: ${{ matrix.otp-version == '24' }}
     - name: Publish Documentation
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: edoc
         path: |
@@ -90,7 +90,7 @@ jobs:
     - name: Run CT Tests
       run: rebar3 ct
     - name: Store CT Logs
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v3
       with:
         name: ct-logs
         path: _build/test/logs
